@@ -100,6 +100,7 @@ export const generateGcode = (modelInfos, onProgress) => {
 
     let isRotate;
     let diameter;
+    let isCW;
 
     for (let i = 0; i < modelInfos.length; i++) {
         const modelInfo = modelInfos[i];
@@ -138,6 +139,7 @@ export const generateGcode = (modelInfos, onProgress) => {
 
         isRotate = toolPathObj.isRotate;
         diameter = toolPathObj.diameter;
+        isCW = toolPathObj.isCW;
 
         if (boundingBox === null) {
             boundingBox = toolPathObj.boundingBox;
@@ -165,6 +167,7 @@ export const generateGcode = (modelInfos, onProgress) => {
         + `;estimated_time(s): ${estimatedTime}\n`
         + `;is_rotate: ${isRotate}\n`
         + `;diameter: ${diameter}\n`
+        + `;is_cw: ${isCW}\n`
         + `;max_x(mm): ${boundingBox.max.x}\n`
         + `;max_y(mm): ${boundingBox.max.y}\n`
         + `;max_z(mm): ${boundingBox.max.z}\n`

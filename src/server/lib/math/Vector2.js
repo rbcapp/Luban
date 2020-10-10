@@ -67,4 +67,10 @@ export class Vector2 {
         const angle = Math.atan2(v.y, v.x) * 180 / Math.PI;
         return angle > 0 ? angle : angle + 360;
     }
+
+    static rotate(p, angle, center = { x: 0, y: 0 }) {
+        const x = (p.x - center.x) * Math.cos(angle) - (p.y - center.y) * Math.sin(angle) + center.x;
+        const y = (p.x - center.x) * Math.sin(angle) + (p.y - center.y) * Math.cos(angle) + center.y;
+        return { x, y };
+    }
 }

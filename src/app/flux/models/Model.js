@@ -370,10 +370,6 @@ class Model {
 
             this.meshObject.scale.x = width / geometrySize.x;
 
-            console.log('width', this.sourceWidth, this.width, geometrySize.x);
-
-            console.log(this.meshObject.scale.x, this.transformation.scaleX);
-
             this.transformation.width = width;
         }
         if (height) {

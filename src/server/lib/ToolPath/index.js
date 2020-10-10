@@ -270,7 +270,6 @@ class ToolPath {
             } else {
                 this.commands.push(commandObj);
             }
-            this.setState(commandObj);
         } else {
             if (commandObj.G === 4) {
                 if (commandObj.S) {
@@ -283,6 +282,8 @@ class ToolPath {
             this.commands.push(commandObj);
             this.setDirection(null);
         }
+
+        this.setState(commandObj);
     }
 
     setBoundingBox(commandObj) {

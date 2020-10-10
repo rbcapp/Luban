@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { PROCESS_MODE_VECTOR } from '../../constants';
 
 export class ViewPathRenderer {
-    render(viewPaths, size) {
+    async render(viewPaths, size) {
+        await this._generateTexture();
         const objs = this._generateViewPathObjs(viewPaths);
         const background = this._generateBackground(viewPaths, size);
 
@@ -11,6 +12,14 @@ export class ViewPathRenderer {
         g.add(objs);
 
         return g;
+    }
+
+    _generateTexture() {
+        return new Promise(resolve => {
+            this.texture = new THREE.TextureLoader().load('../../images/wood.png', () => {
+                resolve();
+            });
+        });
     }
 
     _generateSvgViewPathObj(viewPath) {
@@ -54,7 +63,9 @@ export class ViewPathRenderer {
         geometry.computeFaceNormals();
         geometry.computeVertexNormals();
 
-        const mesh = new THREE.Mesh(geometry, new THREE.MeshPhongMaterial({ color: '#fee5c6' }));
+        const materials = this._generateMaterial();
+
+        const mesh = new THREE.Mesh(geometry, materials);
 
         if (viewPath.positionX) {
             mesh.position.x = viewPath.positionX;
@@ -72,6 +83,7 @@ export class ViewPathRenderer {
     _generateViewPathObjs(viewPaths) {
         const group = new THREE.Group();
         for (const viewPath of viewPaths.data) {
+            // eslint-disable-next-line no-unused-vars
             const { mode, boundingBox } = viewPath;
             const mesh = mode === PROCESS_MODE_VECTOR
                 ? this._generateSvgViewPathObj(viewPath)
@@ -79,7 +91,8 @@ export class ViewPathRenderer {
 
             if (!viewPaths.isRotate) {
                 const boxPoints = this._generateByBox(boundingBox.min, boundingBox.max);
-                const boxMesh = this._generateMesh(new THREE.Shape(boxPoints), viewPaths.targetDepth - boundingBox.length.z);
+                const boxMesh = this._generateMesh(new THREE.Shape(boxPoints),
+                    viewPaths.targetDepth - boundingBox.length.z, '#cccccc');
                 boxMesh.position.z = -viewPaths.targetDepth;
                 group.add(boxMesh);
             }
@@ -97,7 +110,7 @@ export class ViewPathRenderer {
             for (const hole of holes) {
                 if (hole.min > start) {
                     const geometry = new THREE.CylinderGeometry(viewPaths.diameter / 2, viewPaths.diameter / 2, hole.min - start, 32);
-                    const material = new THREE.MeshPhongMaterial({ color: '#fee5c6' });
+                    const material = this._generateMaterial();
                     const mesh = new THREE.Mesh(geometry, material);
                     mesh.position.y = (hole.min + start) / 2;
                     group.add(mesh);
@@ -106,7 +119,7 @@ export class ViewPathRenderer {
             }
             if (size.y > start) {
                 const geometry = new THREE.CylinderGeometry(viewPaths.diameter / 2, viewPaths.diameter / 2, size.y - start, 32);
-                const material = new THREE.MeshPhongMaterial({ color: '#fee5c6' });
+                const material = this._generateMaterial();
                 const mesh = new THREE.Mesh(geometry, material);
                 mesh.position.y = (size.y + start) / 2;
                 group.add(mesh);
@@ -137,14 +150,22 @@ export class ViewPathRenderer {
         ];
     }
 
-    _generateMesh(shapes, depth) {
+    _generateMaterial(color = '#ffffff') {
+        return new THREE.MeshPhongMaterial(
+            {
+                color: color,
+                shininess: 0,
+                map: this.texture
+            }
+        );
+    }
+
+    _generateMesh(shapes, depth, color) {
         const geometry = new THREE.ExtrudeGeometry(shapes, {
             steps: 2,
             depth: depth,
             bevelEnabled: false
         });
-        // eslint-disable-next-line no-unused-vars
-        const material = new THREE.MeshPhongMaterial({ color: '#fee5c6' });
-        return new THREE.Mesh(geometry, material);
+        return new THREE.Mesh(geometry, this._generateMaterial(color));
     }
 }

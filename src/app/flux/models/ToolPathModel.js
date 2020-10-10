@@ -38,7 +38,6 @@ class ToolPathModel {
     }
 
     updateVisible(param) {
-        console.log('updateVisible');
         this.toolPathObj3D && (this.toolPathObj3D.visible = param);
     }
 

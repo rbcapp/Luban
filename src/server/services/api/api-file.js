@@ -14,11 +14,9 @@ import { zipFolder, unzipFile } from '../../lib/archive';
 const log = logger('api:file');
 
 const cpFileToTmp = async (file, uploadName) => {
-    console.log(file);
     const originalName = path.basename(file.name);
     uploadName = uploadName || originalName;
     const uploadPath = `${DataStorage.tmpDir}/${uploadName}`;
-    console.log(file.path, uploadPath);
     return new Promise(resolve => {
         fs.copyFile(file.path, uploadPath, (err) => {
             if (err) {
@@ -278,10 +276,8 @@ export const uploadFileToTmp = (req, res) => {
 };
 
 export const recoverProjectFile = async (req, res) => {
-    console.log(req.body, req.files);
     const file = req.files.file || JSON.parse(req.body.file);
     const { uploadName } = await cpFileToTmp(file);
-    console.log(uploadName);
 
     await unzipFile(`${uploadName}`, `${DataStorage.tmpDir}`);
 

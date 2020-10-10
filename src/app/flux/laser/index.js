@@ -22,6 +22,7 @@ const INITIAL_STATE = {
         diameter: 24,
         length: MACHINE_SERIES.ORIGINAL.setting.size.y,
         fixtureLength: 20,
+        isCW: true,
         x: 0,
         y: 0,
         z: 0

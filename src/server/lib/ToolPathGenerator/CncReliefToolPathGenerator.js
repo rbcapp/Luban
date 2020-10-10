@@ -4,6 +4,7 @@ import EventEmitter from 'events';
 import Normalizer from './Normalizer';
 import ToolPath from '../ToolPath';
 import { round } from '../../../shared/lib/utils';
+import { CNC_IMAGE_NEGATIVE_RANGE_FIELD } from '../../constants';
 
 const OVERLAP_RATE = 0.5;
 const MAX_DENSITY = 20;
@@ -11,26 +12,31 @@ const MAX_DENSITY = 20;
 export default class CncReliefToolPathGenerator extends EventEmitter {
     constructor(modelInfo, modelPath) {
         super();
-        const { config, transformation, gcodeConfig, isRotate, diameter } = modelInfo;
+        const { config, transformation, gcodeConfig, isRotate, diameter, isCW } = modelInfo;
         const { toolDiameter, toolAngle, targetDepth, stepDown, density, isModel = false } = gcodeConfig;
 
         const { invert } = config;
+
+        const radius = diameter / 2;
 
         this.modelInfo = modelInfo;
         this.modelPath = modelPath;
 
         this.gcodeConfig = gcodeConfig;
+        this.transformation = transformation;
 
         this.isRotate = isRotate;
         this.diameter = diameter;
+        this.isCW = isCW;
+
         this.isModel = isModel;
 
-        this.initialZ = isRotate ? diameter / 2 : 0;
-        this.targetDepth = this.isModel ? diameter / 2 : targetDepth;
+        this.targetDepth = isModel ? diameter : targetDepth;
+
+        this.initialZ = isRotate ? radius : 0;
+
         this.finalDepth = this.initialZ - this.targetDepth;
         this.stepDown = stepDown;
-
-        this.transformation = transformation;
 
         this.density = Math.min(density, this.calMaxDensity(toolDiameter, transformation));
 
@@ -74,17 +80,16 @@ export default class CncReliefToolPathGenerator extends EventEmitter {
                     img.invert();
                 }
 
-                const { width, height } = img.bitmap;
-
                 img
                     .greyscale()
+                    .resize(this.targetWidth, this.targetHeight)
                     .flip((this.flip & 2) > 0, (this.flip & 1) > 0)
                     .rotate(-this.rotationZ * 180 / Math.PI)
                     .background(0xffffffff);
 
                 // targetWidth&targetHeight will be changed after rotated
-                const targetWidth = Math.round(this.targetWidth * img.bitmap.width / width);
-                const targetHeight = Math.round(this.targetHeight * img.bitmap.height / height);
+                const targetWidth = img.bitmap.width;
+                const targetHeight = img.bitmap.height;
 
                 this._initGenerator(targetWidth, targetHeight);
 
@@ -96,14 +101,21 @@ export default class CncReliefToolPathGenerator extends EventEmitter {
                         const y = Math.floor(j / this.targetHeight * img.bitmap.height);
                         const idx = y * img.bitmap.width * 4 + x * 4;
                         const a = img.bitmap.data[idx + 3];
-                        data[i][j] = a === 255 ? img.bitmap.data[idx] : 0;
+                        if (a === CNC_IMAGE_NEGATIVE_RANGE_FIELD) {
+                            data[i][j] = -img.bitmap.data[idx];
+                        } else if (a === 0) {
+                            data[i][j] = 255;
+                        } else {
+                            data[i][j] = img.bitmap.data[idx];
+                        }
                     }
                 }
 
-
-                let smooth = false;
-                while (!smooth) {
-                    smooth = !this.upSmooth(data);
+                if (!this.isModel) {
+                    let smooth = false;
+                    while (!smooth) {
+                        smooth = !this.upSmooth(data);
+                    }
                 }
                 return data;
             });
@@ -119,14 +131,16 @@ export default class CncReliefToolPathGenerator extends EventEmitter {
         return Math.min(MAX_DENSITY, maxDensity1, maxDensity2);
     }
 
-    calc(grey) {
-        return grey - 255 / (this.targetDepth * this.density * this.toolSlope);
+    calc(grey, depthOffsetRatio) {
+        return grey - 255 / depthOffsetRatio;
     }
 
     upSmooth = (data) => {
         const width = data.length;
         const height = data[0].length;
-        const depthOffsetRatio = this.targetDepth * this.density * this.toolSlope;
+        const depthOffsetRatio = this.isRotate
+            ? Math.min(this.targetDepth, this.diameter / 2) * this.density * this.toolSlope
+            : this.targetDepth * this.density * this.toolSlope;
         let updated = false;
         const dx = [-1, -1, -1, 0, 0, 1, 1, 1];
         const dy = [-1, 0, 1, -1, 1, -1, 0, 1];
@@ -142,7 +156,7 @@ export default class CncReliefToolPathGenerator extends EventEmitter {
                         }
                         allowedDepth = Math.max(allowedDepth, data[i2][j2]);
                     }
-                    allowedDepth = this.calc(allowedDepth);
+                    allowedDepth = this.calc(allowedDepth, depthOffsetRatio);
                 }
                 if (data[i][j] < allowedDepth) {
                     data[i][j] = allowedDepth;
@@ -173,6 +187,32 @@ export default class CncReliefToolPathGenerator extends EventEmitter {
 
         const pathLength = this.isModel ? this.targetWidth : Math.round(this.diameter * Math.PI * this.density);
 
+        // eslint-disable-next-line no-unused-vars
+        const pathNegativeReordering = (path) => {
+            let start = 0;
+            const len = path.length;
+            for (let i = 0; i < len; i++) {
+                if (path.z > 0) {
+                    start = i;
+                    break;
+                }
+            }
+            let left = null;
+            // eslint-disable-next-line no-unused-vars
+            let right = null;
+            for (let i = start; i < start + len; i++) {
+                if (path[i % len].z < 0) {
+                    if (left === null) {
+                        left = i;
+                    }
+                } else {
+                    if (left !== null) {
+                        right = i - 1;
+                    }
+                }
+            }
+        };
+
         for (let j = 0; j < this.targetHeight; j++) {
             const path = [];
             for (let i = 0; i < Math.max(this.targetWidth, pathLength); i++) {
@@ -198,20 +238,23 @@ export default class CncReliefToolPathGenerator extends EventEmitter {
 
         paths.push(paths[paths.length - 1]);
 
+        const width = this.targetWidth / this.density;
+        const height = this.targetHeight / this.density;
+
         const boundingBox = {
             max: {
-                x: this.transformation.positionX + this.transformation.width / 2,
-                y: this.transformation.positionY + this.transformation.height / 2,
+                x: this.transformation.positionX + width / 2,
+                y: this.transformation.positionY + height / 2,
                 z: -this.targetDepth
             },
             min: {
-                x: this.transformation.positionX - this.transformation.width / 2,
-                y: this.transformation.positionY - this.transformation.height / 2,
+                x: this.transformation.positionX - width / 2,
+                y: this.transformation.positionY - height / 2,
                 z: 0
             },
             length: {
-                x: this.transformation.width,
-                y: this.transformation.height,
+                x: width,
+                y: height,
                 z: this.targetDepth
             }
         };
@@ -221,8 +264,8 @@ export default class CncReliefToolPathGenerator extends EventEmitter {
             positionX: 0,
             positionY: this.transformation.positionY,
             rotationB: this.isRotate ? this.toolPath.toB(this.transformation.positionX) : 0,
-            width: this.transformation.width,
-            height: this.transformation.height,
+            width: width,
+            height: height,
             boundingBox: boundingBox,
             isRotate: this.isRotate,
             diameter: this.diameter
@@ -246,28 +289,31 @@ export default class CncReliefToolPathGenerator extends EventEmitter {
             paths.push(path);
         }
 
+        const width = this.targetWidth / this.density;
+        const height = this.targetHeight / this.density;
+
         const boundingBox = {
             max: {
-                x: this.transformation.positionX + this.transformation.width / 2,
-                y: this.transformation.positionY + this.transformation.height / 2,
+                x: this.transformation.positionX + width / 2,
+                y: this.transformation.positionY + height / 2,
                 z: -this.targetDepth
             },
             min: {
-                x: this.transformation.positionX - this.transformation.width / 2,
-                y: this.transformation.positionY - this.transformation.height / 2,
+                x: this.transformation.positionX - width / 2,
+                y: this.transformation.positionY - height / 2,
                 z: 0
             },
             length: {
-                x: this.transformation.width,
-                y: this.transformation.height,
+                x: width,
+                y: height,
                 z: this.targetDepth
             }
         };
 
         return {
             data: paths,
-            width: this.transformation.width,
-            height: this.transformation.height,
+            width: width,
+            height: height,
             targetDepth: this.targetDepth,
             positionX: positionX,
             positionY: positionY,
@@ -315,7 +361,7 @@ export default class CncReliefToolPathGenerator extends EventEmitter {
             zMin[j] = this.initialZ;
             for (let i = 0; i < this.targetWidth; i++) {
                 const z = this._calculateThePrintZ(data[i][j]);
-                data[i][j] = z;
+                data[i][j] = round(z, 2);
                 zMin[j] = Math.min(zMin[j], z);
             }
         }
@@ -386,7 +432,7 @@ export default class CncReliefToolPathGenerator extends EventEmitter {
             this.toolPath.move0XY(normalizedX0, normalizedHeight, jogSpeed);
 
             currentZ = safetyHeight;
-            curDepth = Math.round((curDepth - this.stepDown) * 100) / 100;
+            curDepth = round((curDepth - this.stepDown), 2);
 
             if (curDepth < this.finalDepth) {
                 break;
@@ -398,9 +444,15 @@ export default class CncReliefToolPathGenerator extends EventEmitter {
         this.toolPath.spindleOff();
 
         const boundingBox = this.toolPath.boundingBox;
+        const { positionX } = this.transformation;
 
-        boundingBox.max.x += this.transformation.positionX;
-        boundingBox.min.x += this.transformation.positionX;
+        if (this.isRotate) {
+            boundingBox.max.b += this.toolPath.toB(positionX);
+            boundingBox.min.b += this.toolPath.toB(positionX);
+        } else {
+            boundingBox.max.x += positionX;
+            boundingBox.min.x += positionX;
+        }
         boundingBox.max.y += this.transformation.positionY;
         boundingBox.min.y += this.transformation.positionY;
 
@@ -418,7 +470,8 @@ export default class CncReliefToolPathGenerator extends EventEmitter {
             rotationB: this.isRotate ? this.toolPath.toB(this.transformation.positionX) : 0,
             boundingBox: boundingBox,
             isRotate: this.isRotate,
-            diameter: this.diameter
+            diameter: this.diameter,
+            isCW: this.isCW
         };
     };
 

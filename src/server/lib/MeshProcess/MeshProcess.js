@@ -179,8 +179,8 @@ export class MeshProcess {
                 for (let i = 0; i < width; i++) {
                     for (let j = 0; j < height; j++) {
                         const ii = i - this.extensionX;
-                        const jj = j - this.extensionY;
-                        const idx = jj * width * 4 + ii * 4;
+                        const jj = height - 1 - (j - this.extensionY);
+                        const idx = j * width * 4 + ii * 4;
                         const d = data[ii] && data[ii][jj] ? data[ii][jj] / maxZ * grayRange + this.minGray : 0;
 
                         image.bitmap.data[idx] = d;
@@ -272,14 +272,14 @@ export class MeshProcess {
                 for (let i = 0; i < width; i++) {
                     for (let j = 0; j < height; j++) {
                         const idx = j * width * 4 + i * 4;
-                        // const d = data[j][i] ? data[j][i][0] / maxR * 255 : 0;
+                        const h = height - 1 - j;
                         let d = 0;
                         let a = 255;
                         const k = (i + width / 2) % width;
-                        if (data[j][i]) {
-                            d = data[j][i][0] / maxR * 255;
-                        } else if (data[j][k] && data[j][k][1] < data[j][k][0]) {
-                            d = data[j][k][1] / maxR * 255;
+                        if (data[h][i]) {
+                            d = data[h][i][0] / maxR * 255;
+                        } else if (data[h][k] && data[h][k][1] < data[h][k][0]) {
+                            d = data[h][k][1] / maxR * 255;
                             a = CNC_IMAGE_NEGATIVE_RANGE_FIELD;
                         }
 

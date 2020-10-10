@@ -82,6 +82,8 @@ class GcodeToBufferGeometryWorkspace {
                         indexColors.push(indexColor[2]);
 
                         lastMotion = motion;
+
+                        indexs.push(indexCount);
                     }
 
                     const segCount = Math.max(Math.ceil(Math.abs(v2.b - v1.b) / 5), 1);
@@ -102,10 +104,9 @@ class GcodeToBufferGeometryWorkspace {
                         indexColors.push(indexColor[0]);
                         indexColors.push(indexColor[1]);
                         indexColors.push(indexColor[2]);
-                    }
 
-                    indexs.push(indexCount);
-                    indexs.push(indexCount);
+                        indexs.push(indexCount);
+                    }
 
                     if (motion === 'G1' && (v1.x !== v2.x || v1.y !== v2.y || v1.z !== v2.z)) {
                         if (boundingBox === null) {
@@ -229,8 +230,6 @@ class GcodeToBufferGeometryWorkspace {
                 }
                 indexCount = i;
             });
-
-            console.log(boundingBox);
 
             onProgress(1);
 

@@ -178,6 +178,12 @@ class ToolPath {
             if (param !== undefined && param !== null) {
                 this.modal.diameter = param;
             }
+        },
+
+        ';is_cw': (param) => {
+            if (param !== undefined && param !== null) {
+                this.modal.isCW = param;
+            }
         }
     };
 
@@ -198,7 +204,7 @@ class ToolPath {
                 x: this.translateX(params.X),
                 y: this.translateY(params.Y),
                 z: this.translateZ(params.Z),
-                b: this.translateB(params.B),
+                b: this.translateB(params.B, this.modal.isCW),
                 type: this.translateType(params.E)
             };
             const targetPosition = { x: v2.x, y: v2.y, z: v2.z, b: v2.b, e: params.E };
@@ -239,7 +245,7 @@ class ToolPath {
                 x: this.translateX(params.X),
                 y: this.translateY(params.Y),
                 z: this.translateZ(params.Z),
-                b: this.translateB(params.B),
+                b: this.translateB(params.B, this.modal.isCW),
                 type: this.translateType(params.E)
             };
             const targetPosition = { x: v2.x, y: v2.y, z: v2.z, b: v2.b, e: params.E };
@@ -859,9 +865,12 @@ class ToolPath {
         return translatePosition(this.position.z, z, !!relative);
     }
 
-    translateB(b, relative) {
+    translateB(b, isCW, relative) {
         if (b !== undefined) {
             b = this.isImperialUnits() ? in2mm(b) : b;
+        }
+        if (isCW) {
+            b = -b;
         }
         if (relative === undefined) {
             relative = this.isRelativeDistance();

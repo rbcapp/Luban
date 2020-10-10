@@ -117,7 +117,6 @@ export const actions = {
         api.uploadImage(formData)
             .then((res) => {
                 const { width, height, originalName, uploadName } = res.body;
-                console.log(width, height, originalName, uploadName);
                 dispatch(actions.generateModel(headType, originalName, uploadName, width, height, mode));
             })
             .catch((err) => {
@@ -224,8 +223,6 @@ export const actions = {
         api.processImage(options)
             .then((res) => {
                 options.processImageName = res.body.filename;
-
-                console.log(options.processImageName);
 
                 dispatch(svgModelActions.generateSvgModel(headType, options));
                 dispatch(threejsModelActions.generateThreejsModel(headType, options));
@@ -390,8 +387,6 @@ export const actions = {
             },
             isRotate: materials.isRotate
         };
-
-        console.log('config', config, options);
 
         api.processImage(options)
             .then((res) => {
@@ -601,7 +596,7 @@ export const actions = {
         }
 
         const { materials } = getState()[headType];
-        const { isRotate = false, diameter = 0 } = materials || {};
+        const { isRotate = false, diameter = 0, isCW = true } = materials || {};
 
         if (isProcess || autoPreviewEnabled) {
             const modelState = modelGroup.getSelectedModel()
@@ -613,7 +608,8 @@ export const actions = {
                         ...modelState,
                         ...toolPathModelTaskInfo,
                         isRotate: isRotate,
-                        diameter: diameter
+                        diameter: diameter,
+                        isCW: isCW
                     };
                     controller.commitToolPathTask({
                         taskId: taskInfo.modelID,
@@ -636,7 +632,7 @@ export const actions = {
         }
 
         const { materials } = getState()[headType];
-        const { isRotate = false, diameter = 0 } = materials || {};
+        const { isRotate = false, diameter = 0, isCW = true } = materials || {};
 
         if (isProcess || autoPreviewEnabled) {
             for (const model of modelGroup.getModels()) {
@@ -647,7 +643,8 @@ export const actions = {
                         ...modelTaskInfo,
                         ...toolPathModelTaskInfo,
                         isRotate: isRotate,
-                        diameter: diameter
+                        diameter: diameter,
+                        isCW: isCW
                     };
                     controller.commitToolPathTask({
                         taskId: taskInfo.modelID,

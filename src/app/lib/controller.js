@@ -238,7 +238,6 @@ class SerialPortClient {
     }
 
     commitViewPathTask(task) {
-        console.log('viewpath');
         socketController.emit('taskCommit:generateViewPath', task);
     }
 

@@ -119,7 +119,6 @@ class TaskManager extends EventEmitter {
                 taskSelected.socket.emit(`taskCompleted:${taskSelected.taskType}`, taskSelected.getData());
             }
         } catch (e) {
-            console.log('this is catch');
             log.error(e);
             this.status = TASK_STATUS_IDLE;
 

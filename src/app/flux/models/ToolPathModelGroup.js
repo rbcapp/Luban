@@ -198,11 +198,11 @@ class ToolPathModelGroup {
         return new Promise((resolve, reject) => {
             new THREE.FileLoader().load(
                 toolPathFilePath,
-                (data) => {
+                async (data) => {
                     this.viewPathObj && (this.viewPathObjs.remove(this.viewPathObj));
 
                     const viewPathObj = JSON.parse(data);
-                    this.viewPathObj = new ViewPathRenderer().render(viewPathObj, size);
+                    this.viewPathObj = await new ViewPathRenderer().render(viewPathObj, size);
 
                     this.viewPathObjs.add(this.viewPathObj);
 

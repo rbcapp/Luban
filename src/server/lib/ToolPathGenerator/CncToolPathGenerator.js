@@ -334,7 +334,7 @@ export default class CNCToolPathGenerator extends EventEmitter {
 
     generateToolPathObj(svg, modelInfo) {
         // const { transformation, source } = modelInfo;
-        const { headType, mode, transformation, gcodeConfig, isRotate, diameter } = modelInfo;
+        const { headType, mode, transformation, gcodeConfig, isRotate, diameter, isCW } = modelInfo;
 
         const { positionX, positionY, positionZ } = transformation;
 
@@ -344,8 +344,13 @@ export default class CNCToolPathGenerator extends EventEmitter {
 
         const boundingBox = toolPath.boundingBox;
 
-        boundingBox.max.x += positionX;
-        boundingBox.min.x += positionX;
+        if (isRotate) {
+            boundingBox.max.b += toolPath.toB(positionX);
+            boundingBox.min.b += toolPath.toB(positionX);
+        } else {
+            boundingBox.max.x += positionX;
+            boundingBox.min.x += positionX;
+        }
         boundingBox.max.y += positionY;
         boundingBox.min.y += positionY;
 
@@ -361,7 +366,8 @@ export default class CNCToolPathGenerator extends EventEmitter {
             rotationB: isRotate ? toolPath.toB(positionX) : 0,
             boundingBox: boundingBox,
             isRotate: isRotate,
-            diameter: diameter
+            diameter: diameter,
+            isCW: isCW
         };
     }
 
@@ -373,17 +379,24 @@ export default class CNCToolPathGenerator extends EventEmitter {
             targetDepth
         } = gcodeConfig;
 
-        const { positionX, positionY, positionZ, width, height } = transformation;
-
+        const { positionX, positionY, positionZ } = transformation;
 
         this._processSVG(svg, modelInfo);
 
+        const minX = svg.viewBox[0];
+        const maxX = svg.viewBox[0] + svg.viewBox[2];
+        const minY = svg.viewBox[1];
+        const maxY = svg.viewBox[1] + svg.viewBox[3];
+
+        const width = maxX - minX;
+        const height = maxY - minY;
+
         const normalizer = new Normalizer(
             'Center',
-            svg.viewBox[0],
-            svg.viewBox[0] + svg.viewBox[2],
-            svg.viewBox[1],
-            svg.viewBox[1] + svg.viewBox[3],
+            minX,
+            maxX,
+            minY,
+            maxY,
             { x: 1, y: 1 },
             { x: 0, y: 0 }
         );
@@ -437,13 +450,15 @@ export default class CNCToolPathGenerator extends EventEmitter {
             }
         };
 
-        const viewPath = [[
+        const boxPoints = [
             [-off, -off],
             [-off, boundingBox.length.y - off],
             [boundingBox.length.x - off, boundingBox.length.y - off],
             [boundingBox.length.x - off, -off],
             [-off, -off]
-        ]];
+        ];
+
+        const viewPath = [boxPoints];
         for (const polygon of polygons) {
             for (const path of polygon) {
                 viewPath.push(path);
